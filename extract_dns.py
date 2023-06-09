@@ -1,10 +1,36 @@
 import os
 import time
+import glob
 from selenium import webdriver
-from selenium.webdriver.chrome.service import Service
-from selenium.webdriver.common.by import By
-from selenium.webdriver.common.keys import Keys
 from selenium.webdriver.chrome.options import Options
+from colorama import Fore, Style
+
+# Function to check if a directory path is valid
+def validate_path(path):
+    if os.path.isdir(path):
+        print("Selected path:", path, "✓")
+        return True
+    else:
+        print("Invalid path. Please enter a valid path.")
+        return False
+
+def select_project_file(path):
+    projects = glob.glob(os.path.join(path, "*", "project.txt"))
+    if not projects:
+        print("No project files found in the specified path.")
+        return None
+    print("Available project files:")
+    for i, project_file in enumerate(projects):
+        print(f"{i+1}. {project_file}")
+    choice = input("Enter the number of the project file: ")
+    try:
+        index = int(choice) - 1
+        if index < 0 or index >= len(projects):
+            raise ValueError
+        return projects[index]
+    except (ValueError, IndexError):
+        print("Invalid choice. Please enter a valid number.")
+        return None
 
 # Function to extract domain information from a project text file
 def extract_domain_info(file_path):
@@ -29,7 +55,7 @@ def get_field_value(content, field_name):
 
 # Function to display domain information in a table format
 def display_domain_info(domain_info_list):
-    print("+------------------------------------+")
+    print(Fore.BLUE + "+------------------------------------+")
     print("|          Result              |")
     print("+------------------------------------+")
     print("|   Company name           | Domain name             | Information Supplementary  |")
@@ -39,13 +65,43 @@ def display_domain_info(domain_info_list):
         print(f"|   {company_name:<23} | {domain_name:<22} | {info_supplementary:<26} |")
 
     print("+------------------------------------+")
+    print(Style.RESET_ALL)
 
 # Function to export domain information to a text file
-def export_domain_info(domain_info_list, export_file_path):
-    with open(export_file_path, "w") as f:
-        f.write("Company Name\tDomain Name\tInformation Supplementary\n")
-        for company_name, domain_name, info_supplementary in domain_info_list:
-            f.write(f"{company_name}\t{domain_name}\t{info_supplementary}\n")
+def export_domains(project_folder):
+    project_files = get_project_files(project_folder)
+
+    if not project_files:
+        print("No project files found in the specified folder.")
+        return
+
+    print("\n--- Exporting Domain Information ---\n")
+
+    domain_info_list = []
+    for project_file in project_files:
+        company_name, domain_name, info_supp = extract_domain_info(project_file)
+        domain_info_list.append((company_name, domain_name, info_supp))
+
+    display_domain_info(domain_info_list)
+
+    export_choice = input("Do you want to export the domain information to a file? (y/n): ")
+    if export_choice.lower() == "y":
+        export_file_name = "Domain-Export.txt"
+        export_path = os.path.join(os.path.dirname(__file__), "Domain Exported", export_file_name)
+
+        with open(export_path, "w") as f:
+            f.write("+------------------------------------+\n")
+            f.write("|          Result              |\n")
+            f.write("+------------------------------------+\n")
+            f.write("|   Company name           | Domain name             | Information Supplementary  |\n")
+            f.write("+------------------------------------+\n")
+            for company_name, domain_name, info_supp in domain_info_list:
+                f.write(f"|   {company_name:<23} | {domain_name:<22} | {info_supp:<26} |\n")
+            f.write("+------------------------------------+\n")
+
+        print(f"\nDomain information exported to: {export_path}")
+    else:
+        print("\nDomain information export canceled.")
 
 # Function to capture website screenshot
 def capture_screenshot(url, file_path):
@@ -55,7 +111,7 @@ def capture_screenshot(url, file_path):
     options.add_argument("--disable-infobars")
     options.add_argument("--disable-dev-shm-usage")
     options.add_argument("--no-sandbox")
-    driver = webdriver.Chrome(chrome_options=options)
+    driver = webdriver.Chrome(options=options)
 
     try:
         driver.get(url)
@@ -71,62 +127,40 @@ def capture_screenshot(url, file_path):
 # Main program
 def main():
     print("Welcome to the Domain Extractor and Website Screenshot Capture!")
-    print("==============================================================\n")
+    print("==============================================\n")
+    path = input("Enter the path of the projects folder: ")
+    while not validate_path(path):
+        path = input("Enter the path of the projects folder: ")
 
-    projects_path = input("Enter the path of the projects folder: ")
-
-    project_files = []
-    domain_info_list = []
-
-    # Retrieve project text files from the projects folder
-    for root, dirs, files in os.walk(projects_path):
-        for file in files:
-            if file.endswith(".txt"):
-                project_files.append(os.path.join(root, file))
-
-    # Extract domain information from project text files
-    for file_path in project_files:
-        domain_info = extract_domain_info(file_path)
-        if domain_info[1]:  # Check if domain name is not empty
-            domain_info_list.append(domain_info)
-
-    # Display domain information in the terminal
-    display_domain_info(domain_info_list)
-
+    project_file = None
+    
     while True:
         print("\nSelect an option:")
-        print("1. Capture website screenshots")
+        print("1. Choose the project file")
         print("2. Export domain information to a file")
-        print("3. Exit")
-
+        print("3. Capture website screenshots")
+        print("4. Exit")
         choice = input("Enter your choice: ")
 
         if choice == "1":
-            # Capture website screenshots
-            screenshot_folder = os.path.join(os.path.dirname(os.path.abspath(__file__)), "Website Screenshots")
-            os.makedirs(screenshot_folder, exist_ok=True)
-
-            for company_name, domain_name, _ in domain_info_list:
-                url = f"https://{domain_name}"
-                file_name = f"{company_name} - {domain_name}.png"
-                file_path = os.path.join(screenshot_folder, file_name)
-
-                capture_screenshot(url, file_path)
+            project_file = select_project_file(path)
+            if project_file:
+                print("Selected project file:", project_file)
 
         elif choice == "2":
-            # Export domain information to a text file
-            export_choice = input("\nDo you want to export the domain information to a file? (yes/no): ")
-            if export_choice.lower() == "yes":
-                export_file_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), "Domain Exported", "Domain-name.txt")
-                export_domain_info(domain_info_list, export_file_path)
-                print(f"\nDomain information exported to: {export_file_path}")
-            else:
-                print("Domain information not exported.")
+            if project_file:
+                export_domains(project_file)
 
         elif choice == "3":
+            if project_file:
+                capture_screenshot(project_file)
+
+        elif choice == "4":
+            print("Exiting the program.")
             break
 
-    print("\nExiting the program...")
+        else:
+            print("Invalid choice. Please enter a valid option.")
 
 if __name__ == "__main__":
     main()
