@@ -93,8 +93,6 @@ def export_domains(project_folder):
             f.write("+------------------------------------+\n")
             f.write("|          Result              |\n")
             f.write("+------------------------------------+\n")
-            f.write("|   Company name           | Domain name             | Information Supplementary  |\n")
-            f.write("+------------------------------------+\n")
             for company_name, domain_name, info_supp in domain_info_list:
                 f.write(f"|   {company_name:<23} | {domain_name:<22} | {info_supp:<26} |\n")
             f.write("+------------------------------------+\n")
@@ -104,7 +102,7 @@ def export_domains(project_folder):
         print("\nDomain information export canceled.")
 
 # Function to capture website screenshot
-def capture_screenshot(url, file_path):
+def capture_screenshot(url):
     options = Options()
     options.add_argument("--headless")  # Run Chrome in headless mode
     options.add_argument("--start-maximized")  # Maximize the browser window
@@ -116,6 +114,9 @@ def capture_screenshot(url, file_path):
     try:
         driver.get(url)
         time.sleep(5)  # Wait for the page to load
+
+        file_name = url.split("/")[-1] + ".png"
+        file_path = os.path.join(os.path.dirname(__file__), "Screenshots", file_name)
 
         driver.save_screenshot(file_path)
         print(f"Screenshot captured: {file_path}")
@@ -132,8 +133,6 @@ def main():
     while not validate_path(path):
         path = input("Enter the path of the projects folder: ")
 
-    project_file = None
-    
     while True:
         print("\nSelect an option:")
         print("1. Choose the project file")
@@ -148,12 +147,17 @@ def main():
                 print("Selected project file:", project_file)
 
         elif choice == "2":
-            if project_file:
+            if "project_file" in locals():
                 export_domains(project_file)
+            else:
+                print("No project file selected. Please choose a project file first.")
 
         elif choice == "3":
-            if project_file:
-                capture_screenshot(project_file)
+            if "project_file" in locals():
+                url = input("Enter the URL of the website to capture screenshot: ")
+                capture_screenshot(url)
+            else:
+                print("No project file selected. Please choose a project file first.")
 
         elif choice == "4":
             print("Exiting the program.")
